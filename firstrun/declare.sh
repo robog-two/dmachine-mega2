@@ -6,11 +6,11 @@ REPO_URL="${1:-}"
 
 echo "=== Declare-sh First Run Initialization ==="
 echo "This script will:"
-echo "  1. Install Git and Btrfs tools"
+echo "  1. Install Git, Btrfs tools, and Snapper"
 echo "  2. Clone the declare-sh repository to /opt/declare-sh"
 echo "  3. Install the daily cron job failsafe"
 echo "  4. Install the systemd service"
-echo "  5. Create a Btrfs snapshot for restore points"
+echo "  5. Configure Snapper and create clean-state snapshot"
 echo "  6. Restart the system"
 echo ""
 
@@ -29,11 +29,11 @@ if [ -z "$REPO_URL" ]; then
     fi
 fi
 
-# Install git and btrfs-progs (Debian only)
-echo "=== Installing Git and Btrfs tools ==="
+# Install git, btrfs-progs, and snapper (Debian only)
+echo "=== Installing Git, Btrfs tools, and Snapper ==="
 apt-get update
-apt-get install -y git btrfs-progs
-echo "Git and Btrfs tools installed successfully."
+apt-get install -y git btrfs-progs snapper
+echo "Git, Btrfs tools, and Snapper installed successfully."
 
 # Clone repository to /opt/declare-sh
 echo ""
@@ -75,9 +75,9 @@ systemctl daemon-reload
 systemctl enable run-after-restore.service
 echo "Systemd service installed and enabled."
 
-# Create Btrfs snapshot
+# Configure Snapper and create initial snapshot
 echo ""
-echo "=== Creating Btrfs restore point ==="
+echo "=== Configuring Snapper for root filesystem ==="
 
 # Detect root filesystem
 ROOT_FS=$(findmnt -n -o SOURCE /)
@@ -91,27 +91,68 @@ if ! btrfs filesystem show "$ROOT_FS" &>/dev/null; then
     echo "WARNING: Root filesystem is not Btrfs. Snapshot creation skipped."
     echo "You will need to manually configure restore functionality for your filesystem."
 else
-    # Create snapshot directory
-    SNAPSHOT_DIR="/opt/snapshots"
-    mkdir -p "$SNAPSHOT_DIR"
+    echo "Btrfs root filesystem detected. Setting up Snapper..."
 
-    # Create snapshot name with timestamp
-    SNAPSHOT_NAME="clean-state-$(date +%Y%m%d-%H%M%S)"
-    SNAPSHOT_PATH="$SNAPSHOT_DIR/$SNAPSHOT_NAME"
+    # Create snapper config for root if it doesn't exist
+    if ! snapper -c root list &>/dev/null; then
+        echo "Creating snapper configuration for root..."
+        snapper -c root create-config /
+        echo "Snapper configuration created."
+    else
+        echo "Snapper configuration for root already exists."
+    fi
 
-    echo "Creating snapshot: $SNAPSHOT_PATH"
-    btrfs subvolume snapshot "$ROOT_MOUNT" "$SNAPSHOT_PATH"
-    echo "Snapshot created successfully."
+    # Configure snapper settings for declarative infrastructure
+    echo "Configuring snapper settings..."
+    snapper -c root set-config \
+        TIMELINE_CREATE="no" \
+        TIMELINE_CLEANUP="no" \
+        NUMBER_LIMIT="10" \
+        NUMBER_LIMIT_IMPORTANT="5"
 
-    # Create a symlink to latest snapshot
-    ln -sf "$SNAPSHOT_PATH" "$SNAPSHOT_DIR/clean-state-latest"
-    echo "Symlink created: $SNAPSHOT_DIR/clean-state-latest -> $SNAPSHOT_PATH"
+    echo "Snapper settings configured:"
+    echo "  - Timeline snapshots: disabled (we manage snapshots manually)"
+    echo "  - Number limit: 10 snapshots"
+    echo "  - Important snapshots limit: 5"
 
+    # Delete the default snapshot that snapper creates
+    if snapper -c root list | grep -q "^0 "; then
+        echo "Removing default snapper snapshot..."
+        snapper -c root delete 0 2>/dev/null || true
+    fi
+
+    # Create the clean-state snapshot
+    echo "Creating clean-state snapshot..."
+    if ! snapper -c root create --description "clean-state" --cleanup-algorithm number --userdata "important=yes"; then
+        echo "ERROR: Failed to create snapshot with snapper."
+        echo "Cannot proceed without a valid snapshot for restore functionality."
+        exit 1
+    fi
+
+    # Verify snapshot creation using CSV output for reliable parsing
+    SNAPSHOT_NUM=$(snapper -c root --csvout list --columns number,description | \
+        grep ",clean-state$" | \
+        cut -d',' -f1 | \
+        tail -n 1)
+
+    if [ -n "$SNAPSHOT_NUM" ]; then
+        echo "Clean-state snapshot created: #$SNAPSHOT_NUM"
+    else
+        echo "ERROR: Snapshot creation command succeeded but snapshot not found in list."
+        echo "Available snapshots:"
+        snapper -c root list
+        echo ""
+        echo "Cannot proceed without a valid snapshot for restore functionality."
+        exit 1
+    fi
+
+    # This snapshot will be used for rollback when configuration changes are detected
+    echo "Snapshot configured for automatic restore."
     echo ""
-    echo "NOTE: To restore from this snapshot on boot, configure your bootloader"
-    echo "      to mount the snapshot subvolume instead of the current root."
-    echo "      This typically involves modifying GRUB configuration or using"
-    echo "      Btrfs snapshot boot tools like grub-btrfs or snapper."
+    echo "NOTE: This system uses Snapper for automatic restore to clean state."
+    echo "      When trigger-restore.sh detects new commits, it performs a"
+    echo "      'snapper rollback' to this snapshot, then reboots the system."
+    echo "      After reboot, bootstrap.sh applies the new configuration from Git."
 fi
 
 # Final message
