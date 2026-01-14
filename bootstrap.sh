@@ -23,6 +23,18 @@ if [ "${BOOTSTRAP:-0}" != "1" ]; then
     if [ ! -f "$MARKER_FILE" ]; then
         # PATH 1 ONLY: First run after restore
         echo "[PATH 1] First run detected. Pulling latest configuration from Git..."
+
+        # Wait for DNS to be available before attempting git operations
+        echo "[PATH 1] Waiting for DNS resolution..."
+        for i in {1..30}; do
+            if getent hosts github.com >/dev/null 2>&1; then
+                echo "[PATH 1] DNS is ready"
+                break
+            fi
+            echo "[PATH 1] Waiting for DNS... ($i/30)"
+            sleep 1
+        done
+
         git fetch origin
         git reset --hard origin/main
 
@@ -56,7 +68,7 @@ fi
 # BOTH PATHS: Install Deno if not present
 if ! command -v deno &> /dev/null; then
     echo "Installing Deno..."
-    apt install -y 7z
+    apt install -y 7zip
     curl -fsSL https://deno.land/install.sh | sh
     export DENO_INSTALL="$HOME/.deno"
     export PATH="$DENO_INSTALL/bin:$PATH"
