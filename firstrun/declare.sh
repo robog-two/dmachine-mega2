@@ -17,6 +17,32 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Convert user/repo format to full GitHub URL if needed
+convert_repo_url() {
+    local input="$1"
+
+    # If it looks like a full URL already, return as-is
+    if [[ "$input" =~ ^https?:// ]] || [[ "$input" =~ ^git@ ]]; then
+        echo "$input"
+        return
+    fi
+
+    # If it's user/repo format, convert to GitHub HTTPS URL
+    if [[ "$input" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
+        echo "https://github.com/$input.git"
+        return
+    fi
+
+    # If it's user/repo.git format, convert to GitHub HTTPS URL
+    if [[ "$input" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]]; then
+        echo "https://github.com/$input"
+        return
+    fi
+
+    # Unknown format, return as-is (will fail later with a clear error)
+    echo "$input"
+}
+
 # Get repository URL (always interactive)
 echo "Enter your Git repository:"
 echo "  - Full URL: https://github.com/user/repo.git"
@@ -31,39 +57,6 @@ fi
 REPO_URL=$(convert_repo_url "$REPO_INPUT")
 echo "Using repository: $REPO_URL"
 echo ""
-
-# Convert user/repo format to full GitHub URL if needed
-convert_repo_url() {
-    local input="$1"
-    
-    # If it looks like a full URL already, return as-is
-    if [[ "$input" =~ ^https?:// ]] || [[ "$input" =~ ^git@ ]]; then
-        echo "$input"
-        return
-    fi
-    
-    # If it's user/repo format, convert to GitHub HTTPS URL
-    if [[ "$input" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
-        echo "https://github.com/$input.git"
-        return
-    fi
-    
-    # If it's user/repo.git format, convert to GitHub HTTPS URL
-    if [[ "$input" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]]; then
-        echo "https://github.com/$input"
-        return
-    fi
-    
-    # Unknown format, return as-is (will fail later with a clear error)
-    echo "$input"
-}
-
-
-    
-    REPO_URL=$(convert_repo_url "$REPO_INPUT")
-    echo "Using repository: $REPO_URL"
-    echo ""
-fi
 
 # Install curl, git, btrfs-progs, and snapper (Debian only)
 echo "=== Installing Curl, Git, Btrfs tools, and Snapper ==="
