@@ -1,13 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-# Parse command line arguments
-REPO_URL="${1:-}"
-
 echo "=== Declare-sh First Run Initialization ==="
 echo "This script will:"
 echo "  1. Install Curl, Git, Btrfs tools, and Snapper"
-echo "  2. Clone the declare-sh repository to /opt/declare-sh"
+echo "  2. Clone your configuration repository to /opt/declare-sh"
 echo "  3. Install the daily cron job failsafe"
 echo "  4. Install the systemd service"
 echo "  5. Configure Snapper and create clean-state snapshot"
@@ -20,13 +17,52 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Get repository URL if not provided
-if [ -z "$REPO_URL" ]; then
-    read -r -p "Enter the Git repository URL: " REPO_URL
-    if [ -z "$REPO_URL" ]; then
-        echo "ERROR: Repository URL cannot be empty"
-        exit 1
+# Get repository URL (always interactive)
+echo "Enter your Git repository:"
+echo "  - Full URL: https://github.com/user/repo.git"
+echo "  - Short form: user/repo (assumes GitHub)"
+echo ""
+read -r -p "Repository: " REPO_INPUT
+if [ -z "$REPO_INPUT" ]; then
+    echo "ERROR: Repository cannot be empty"
+    exit 1
+fi
+
+REPO_URL=$(convert_repo_url "$REPO_INPUT")
+echo "Using repository: $REPO_URL"
+echo ""
+
+# Convert user/repo format to full GitHub URL if needed
+convert_repo_url() {
+    local input="$1"
+    
+    # If it looks like a full URL already, return as-is
+    if [[ "$input" =~ ^https?:// ]] || [[ "$input" =~ ^git@ ]]; then
+        echo "$input"
+        return
     fi
+    
+    # If it's user/repo format, convert to GitHub HTTPS URL
+    if [[ "$input" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
+        echo "https://github.com/$input.git"
+        return
+    fi
+    
+    # If it's user/repo.git format, convert to GitHub HTTPS URL
+    if [[ "$input" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]]; then
+        echo "https://github.com/$input"
+        return
+    fi
+    
+    # Unknown format, return as-is (will fail later with a clear error)
+    echo "$input"
+}
+
+
+    
+    REPO_URL=$(convert_repo_url "$REPO_INPUT")
+    echo "Using repository: $REPO_URL"
+    echo ""
 fi
 
 # Install curl, git, btrfs-progs, and snapper (Debian only)

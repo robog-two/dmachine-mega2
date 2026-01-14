@@ -10,11 +10,11 @@ Use a declarative style to manage your infrastructure as code, all with bash scr
 1. Fork this repository to its own "machine" repository. This will be where you store the declarative configuration for the machine.
 2. Configure that repository to send a GitHub webhook to http://your.server.net:23614/webhook (recommended but not required, the server will check every 24h for new commits)
 3. Set up a Debian machine to your ideal "blank" configuration. You should use the same setup on all machines, ideally. You will need btrfs on `/`, and you should make a separate persistent partition, you might want it later.
-3. Run the below command, replace `<repo>` with the HTTPS git URL of your repo
+3. Run the below command (script will prompt for repository)
 
 ```bash
 sudo su
-curl -fsSL https://sh.robog.net/declare | bash -s -- <repo>
+curl -fsSL https://sh.robog.net/declare | bash
 ```
 
 ## Why
