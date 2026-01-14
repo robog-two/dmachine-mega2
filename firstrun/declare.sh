@@ -43,12 +43,20 @@ convert_repo_url() {
     echo "$input"
 }
 
-# Get repository URL (always interactive)
+# Get repository URL from stdin or terminal
 echo "Enter your Git repository:"
 echo "  - Full URL: https://github.com/user/repo.git"
 echo "  - Short form: user/repo (assumes GitHub)"
 echo ""
-read -r -p "Repository: " REPO_INPUT
+
+if [ -t 0 ]; then
+    # stdin is a terminal, read normally
+    read -r -p "Repository: " REPO_INPUT
+else
+    # stdin is piped, read from /dev/tty to get user input
+    read -r -p "Repository: " REPO_INPUT < /dev/tty
+fi
+
 if [ -z "$REPO_INPUT" ]; then
     echo "ERROR: Repository cannot be empty"
     exit 1
