@@ -69,7 +69,7 @@ fi
 if ! command -v deno &> /dev/null; then
     echo "Installing Deno..."
     apt install -y 7zip
-    curl -fsSL https://deno.land/install.sh | sh
+    curl -fsSL https://deno.land/install.sh | sh -s -- -y
     export DENO_INSTALL="$HOME/.deno"
     export PATH="$DENO_INSTALL/bin:$PATH"
 fi
