@@ -56,6 +56,7 @@ fi
 # BOTH PATHS: Install Deno if not present
 if ! command -v deno &> /dev/null; then
     echo "Installing Deno..."
+    apt install -y 7z
     curl -fsSL https://deno.land/install.sh | sh
     export DENO_INSTALL="$HOME/.deno"
     export PATH="$DENO_INSTALL/bin:$PATH"
