@@ -3,23 +3,37 @@ set -euo pipefail
 
 echo "=== Starting one-time system initialization ==="
 
-# Example: Create users (customize as needed)
-# if ! id -u appuser &>/dev/null; then
-#     echo "Creating appuser..."
-#     useradd -m -s /bin/bash appuser
-# fi
+# Install docker, setup, & run the Grapevine indexer
 
-# Example: Install packages (customize as needed)
-# echo "Installing required packages..."
-# apt-get update
-# apt-get install -y curl git btrfs-progs
+# Update the apt package index
+sudo apt-get update
 
-# Example: Configure services (customize as needed)
-# echo "Configuring services..."
-# systemctl enable some-service
-# systemctl start some-service
+# Install packages to allow apt to use a repository over HTTPS
+sudo apt-get install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
 
-# NOTE: Cron job is already installed by firstrun/declare.sh
-# Add your custom initialization logic here
+# Add Docker’s official GPG key
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Set up the stable repository
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
+  https://download.docker.com/linux/debian \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Refresh the package index and install Docker Engine
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+
+# Verify the installation
+docker --version
+
+git clone https://github.com/robog-two/grapevine.git /tmp/grapevine
+
+cd /tmp/grapevine
+docker compose up --build
 
 echo "=== One-time initialization complete ==="
