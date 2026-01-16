@@ -107,9 +107,9 @@ echo "Cron job installed to $CRON_FILE"
 # Install systemd service
 echo ""
 echo "=== Installing systemd service ==="
-cp /opt/declare-sh/run-after-restore.service /etc/systemd/system/
+cp /opt/declare-sh/declare-sh-boot.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable run-after-restore.service
+systemctl enable declare-sh-boot.service
 echo "Systemd service installed and enabled."
 
 # Configure Snapper and create initial snapshot

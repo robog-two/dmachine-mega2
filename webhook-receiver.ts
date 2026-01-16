@@ -123,9 +123,9 @@ async function handleWebhook(req: Request): Promise<Response> {
   return new Response("Not Found", { status: 404 });
 }
 
-console.log(`Webhook receiver listening on http://localhost:${PORT}`);
+console.log(`Webhook receiver listening on port ${PORT}`);
 console.log(`Endpoints:`);
 console.log(`  POST /webhook - Trigger configuration restore`);
 console.log(`  GET  /health  - Health check`);
 
-Deno.serve({ port: PORT }, handleWebhook);
+Deno.serve({ hostname: "::", port: PORT }, handleWebhook);

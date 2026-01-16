@@ -2,11 +2,13 @@
 Description=Run bootstrap script after system restore
 After=network-online.target systemd-resolved.service
 Wants=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
 ExecStart=/opt/declare-sh/bootstrap.sh
 RemainAfterExit=yes
+RestartSec=5
 TimeoutStartSec=300
 Restart=on-failure
 RestartForceExitStatus=1
