@@ -7,7 +7,11 @@ set -euo pipefail
 SNAPSHOT_NUM="$1"
 REPO_DIR="$2"
 
-cd "$REPO_DIR"
+# Redirect output to system console so logs remain visible even after unmounting /
+# /dev/console is a kernel device that persists across filesystem unmounts
+exec > /dev/console 2>&1
+
+cd "$REPO_DIR" 2>/dev/null || true
 
 echo "[$(date)] Entering rescue mode for filesystem swap..."
 systemctl isolate rescue.target
@@ -18,6 +22,12 @@ sleep 2
 echo "[$(date)] Getting the device for root filesystem..."
 ROOT_DEVICE=$(findmnt -n -o SOURCE /)
 echo "[$(date)] Root device: $ROOT_DEVICE"
+
+echo "[$(date)] Unmounting /.snapshots..."
+umount /.snapshots || true
+
+echo "[$(date)] Unmounting / (root filesystem)..."
+umount / || true
 
 echo "[$(date)] Mounting raw filesystem to temporary location..."
 TEMP_MOUNT="/mnt/btrfs_toplevel_$$"
@@ -41,18 +51,20 @@ echo "[$(date)] Getting restored snapshot subvolume ID from temporary mount..."
 SNAPSHOT_ID=$(btrfs inspect-internal rootid "$TEMP_MOUNT/@rootfs_restored")
 echo "[$(date)] Restored snapshot ID: $SNAPSHOT_ID"
 
-echo "[$(date)] Unmounting temporary mount..."
-umount "$TEMP_MOUNT"
-rmdir "$TEMP_MOUNT"
-
 echo "[$(date)] Setting restored snapshot as default root subvolume..."
-if ! btrfs subvolume set-default "$SNAPSHOT_ID" /; then
+if ! btrfs subvolume set-default "$SNAPSHOT_ID" "$TEMP_MOUNT"; then
     echo "[$(date)] ERROR: Failed to set default subvolume."
+    umount "$TEMP_MOUNT" || true
+    rmdir "$TEMP_MOUNT" || true
     systemctl reboot
     exit 1
 fi
 
 echo "[$(date)] Default subvolume set. Old root filesystem will be accessible after reboot."
+
+echo "[$(date)] Unmounting temporary mount..."
+umount "$TEMP_MOUNT" || true
+rmdir "$TEMP_MOUNT" || true
 
 echo "[$(date)] Restore complete. Rebooting..."
 systemctl reboot
