@@ -52,19 +52,30 @@ if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
     CURRENT_SUBVOL=$(btrfs subvolume get-default / | awk '{print $NF}')
     echo "[$(date)] Current subvolume: $CURRENT_SUBVOL"
 
-    # Undo all changes between the clean-state snapshot and current state
-    # This actually reverts the filesystem, not just creating a writable copy
-    snapper -c root undochange "$SNAPSHOT_NUM"..0
+    # Create a writable snapshot from the read-only clean-state snapshot
+    echo "[$(date)] Creating writable copy from clean-state snapshot..."
+    if ! btrfs subvolume snapshot "/home/.snapshots/$SNAPSHOT_NUM/snapshot" "/.root_restored"; then
+        echo "[$(date)] ERROR: Failed to create writable snapshot."
+        echo "[$(date)] Falling back to reboot without restore."
+        systemctl reboot
+        exit 1
+    fi
 
-    # Remove "important" flag from any rollback copies so they can be cleaned up
-    # Only the original clean-state snapshot should be permanently important
-    snapper -c root --csvout list --columns number,description | \
-        grep "writeable copy" | \
-        cut -d',' -f1 | \
-        while read BACKUP_NUM; do
-            echo "[$(date)] Removing important flag from backup snapshot #$BACKUP_NUM..."
-            snapper -c root modify --userdata important= "$BACKUP_NUM" || true
-        done
+    # Swap the subvolumes so the clean state becomes the root filesystem
+    # After swap: "/" contains clean filesystem, "/.root_restored" contains old modified filesystem
+    echo "[$(date)] Swapping root filesystem with clean snapshot..."
+    if ! btrfs subvolume swap "/.root_restored" "/"; then
+        echo "[$(date)] ERROR: Failed to swap subvolumes."
+        echo "[$(date)] Falling back to reboot without restore."
+        systemctl reboot
+        exit 1
+    fi
+
+    # Delete the old root filesystem (now at /.root_restored)
+    echo "[$(date)] Removing old filesystem..."
+    if ! btrfs subvolume delete "/.root_restored"; then
+        echo "[$(date)] WARNING: Failed to delete old root subvolume. Continuing anyway..."
+    fi
 
     echo "[$(date)] Restore complete. Rebooting to verify..."
 
