@@ -36,3 +36,5 @@ git clone https://github.com/robog-two/grapevine.git /tmp/grapevine
 (cd /tmp/grapevine; docker compose up --build &)
 
 echo "=== One-time initialization complete ==="
+
+# I needed a frivolous commit to trigger a restore because something broke.
