@@ -123,42 +123,76 @@ ROOT_MOUNT=$(findmnt -n -o TARGET /)
 echo "Root filesystem: $ROOT_FS"
 echo "Root mount point: $ROOT_MOUNT"
 
-# Check if root is on Btrfs
-if ! btrfs filesystem show "$ROOT_FS" &>/dev/null; then
-    echo "ERROR: Root filesystem is not Btrfs."
+# Check if root is on Btrfs using multiple methods
+ROOT_FSTYPE=""
+
+# Method 1: Try findmnt
+if command -v findmnt &> /dev/null; then
+    ROOT_FSTYPE=$(findmnt -n -o FSTYPE / 2>/dev/null | xargs)
+    echo "findmnt detected filesystem type: '$ROOT_FSTYPE'"
+fi
+
+# Method 2: Fallback to /proc/mounts if findmnt didn't work or returned empty
+if [ -z "$ROOT_FSTYPE" ]; then
+    ROOT_FSTYPE=$(awk '$2 == "/" {print $3; exit}' /proc/mounts)
+    echo "/proc/mounts detected filesystem type: '$ROOT_FSTYPE'"
+fi
+
+# Method 3: Last resort - use stat
+if [ -z "$ROOT_FSTYPE" ]; then
+    ROOT_FSTYPE=$(stat -f -c %T / 2>/dev/null || echo "")
+    echo "stat detected filesystem type: '$ROOT_FSTYPE'"
+fi
+
+echo "Final detected filesystem type: '$ROOT_FSTYPE'"
+
+if [ "$ROOT_FSTYPE" != "btrfs" ]; then
+    echo "ERROR: Root filesystem is not Btrfs (detected as '$ROOT_FSTYPE')."
     echo "declare-sh requires Btrfs for snapshot and restore functionality."
     echo "Please reinstall your system on Btrfs to use this tool."
     exit 1
 else
     echo "Btrfs root filesystem detected. Setting up Snapper..."
 
-    # Create snapper config for root if it doesn't exist
-    if ! snapper -c root list &>/dev/null; then
-        echo "Creating snapper configuration for root..."
-        if ! snapper -c root create-config /; then
-            echo "ERROR: Failed to create snapper configuration."
-            echo "Check that your Btrfs root subvolume is properly configured."
-            exit 1
-        fi
-        echo "Snapper configuration created."
-    else
-        echo "Snapper configuration for root already exists."
-    fi
+     # Create snapper config for root if it doesn't exist
+     if ! snapper -c root list &>/dev/null; then
+         echo "Creating snapper configuration for root..."
+         if ! snapper -c root create-config /; then
+             echo "ERROR: Failed to create snapper configuration."
+             echo "Check that your Btrfs root subvolume is properly configured."
+             exit 1
+         fi
+         echo "Snapper configuration created."
+     else
+         echo "Snapper configuration for root already exists."
+     fi
 
-    # Configure snapper settings for declarative infrastructure
-    echo "Configuring snapper settings..."
-    if ! snapper -c root set-config \
-        FSTYPE="btrfs" \
-        TIMELINE_CREATE="no" \
-        TIMELINE_CLEANUP="no" \
-        NUMBER_CLEANUP="yes" \
-        NUMBER_MIN_AGE="3600" \
-        NUMBER_LIMIT="10" \
-        NUMBER_LIMIT_IMPORTANT="5" \
-        BACKGROUND_COMPARISON="no"; then
-        echo "ERROR: Failed to configure snapper settings."
-        exit 1
-    fi
+     # Configure snapper settings for declarative infrastructure
+     echo "Configuring snapper settings..."
+     
+     # Use snapper set-config with error output for debugging
+     CONFIG_ERROR=$(snapper -c root set-config \
+         TIMELINE_CREATE="no" \
+         TIMELINE_CLEANUP="no" \
+         NUMBER_CLEANUP="yes" \
+         NUMBER_MIN_AGE="3600" \
+         NUMBER_LIMIT="10" \
+         NUMBER_LIMIT_IMPORTANT="5" \
+         BACKGROUND_COMPARISON="no" 2>&1) || CONFIG_EXIT=$?
+     
+     if [ ! -z "${CONFIG_ERROR:-}" ]; then
+         echo "WARNING: snapper set-config output:"
+         echo "$CONFIG_ERROR"
+     fi
+     
+     if [ ! -z "${CONFIG_EXIT:-}" ] && [ "$CONFIG_EXIT" != "0" ]; then
+         echo "ERROR: Failed to configure snapper settings (exit code: $CONFIG_EXIT)."
+         echo "Full error output:"
+         echo "$CONFIG_ERROR"
+         exit 1
+     fi
+     
+     echo "Snapper configuration updated."
 
     echo "Snapper settings configured:"
     echo "  - Filesystem type: btrfs"
