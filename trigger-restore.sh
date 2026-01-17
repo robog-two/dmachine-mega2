@@ -49,7 +49,8 @@ if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
     echo "[$(date)] Performing rollback..."
 
     # Perform the rollback
-    snapper -c root rollback "$SNAPSHOT_NUM"
+    # What does ambit classic mean and why does it fix snapshot restoring? Yet another great mystery of life.
+    snapper --ambit classic -c root rollback "$SNAPSHOT_NUM"
 
     echo "[$(date)] Rollback prepared. Rebooting to complete restore..."
 
