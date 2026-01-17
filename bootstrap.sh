@@ -42,6 +42,24 @@ if [ "${BOOTSTRAP:-0}" != "1" ]; then
         export BOOTSTRAP=1
         exec "$0" "$@"
         # exec replaces this process - script will NOT continue past this line
+    else
+        # PATH 3: Normal boot - pull updates
+        echo "[PATH 3] Normal boot - marker exists, pulling updates from Git..."
+
+        # Wait for DNS to be available before attempting git operations
+        echo "[PATH 3] Waiting for DNS resolution..."
+        for i in {1..30}; do
+            if getent hosts github.com >/dev/null 2>&1; then
+                echo "[PATH 3] DNS is ready"
+                break
+            fi
+            echo "[PATH 3] Waiting for DNS... ($i/30)"
+            sleep 1
+        done
+
+        git fetch origin
+        git reset --hard origin/main
+        echo "[PATH 3] Configuration updated from Git"
     fi
 fi
 # ============================================================================
@@ -57,13 +75,9 @@ fi
 #
 # PATH 3 (Normal boot): BOOTSTRAP=0, marker file exists
 #   → System restarted, marker exists
+#   → Already pulled latest from Git in locked section
 #   → Installs Deno (if needed), starts webhook, skips initialize.sh
 # ============================================================================
-
-# PATH 3 only: Print message for normal boot
-if [ -f "$MARKER_FILE" ]; then
-    echo "[PATH 3] Normal boot - marker exists, starting services..."
-fi
 
 # BOTH PATHS: Install Deno if not present
 if ! command -v deno &> /dev/null; then
