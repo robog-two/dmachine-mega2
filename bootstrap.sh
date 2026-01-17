@@ -91,7 +91,10 @@ echo "Webhook receiver started (PID: $(cat $WEBHOOK_PID_FILE))"
 # PATH 2 only: First-time initialization
 if [ "${BOOTSTRAP:-0}" = "1" ] && [ ! -f "$MARKER_FILE" ]; then
     echo "[PATH 2] Running first-time initialization..."
-    bash "$REPO_DIR/initialize.sh"
+    # Fork initialize.sh in background so failures don't block webhook startup
+    bash "$REPO_DIR/initialize.sh" &
+    INIT_PID=$!
+    echo "[PATH 2] Initialization process started (PID: $INIT_PID)"
 
     echo "[PATH 2] Creating marker file..."
     touch "$MARKER_FILE"
