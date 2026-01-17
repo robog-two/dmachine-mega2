@@ -12,7 +12,17 @@ cd "$REPO_DIR"
 echo "[$(date)] Entering rescue mode for filesystem swap..."
 systemctl isolate rescue.target
 
-# Give rescue mode a moment to settle
+# Wait for rescue mode to be ready - check that we're in rescue.target
+echo "[$(date)] Waiting for rescue mode to settle..."
+for i in {1..30}; do
+    if systemctl is-system-running | grep -q "degraded\|running"; then
+        echo "[$(date)] Rescue mode ready"
+        break
+    fi
+    echo "[$(date)] Waiting... ($i/30)"
+    sleep 1
+done
+
 sleep 2
 
 echo "[$(date)] Making root filesystem read-write..."
