@@ -106,7 +106,7 @@ echo "Webhook receiver started (PID: $(cat $WEBHOOK_PID_FILE))"
 if [ "${BOOTSTRAP:-0}" = "1" ] && [ ! -f "$MARKER_FILE" ]; then
     echo "[PATH 2] Running first-time initialization..."
     # Fork initialize.sh in background so failures don't block webhook startup
-    bash "$REPO_DIR/initialize.sh" &
+    bash "$REPO_DIR/initialize.sh" > /dev/console 2>&1 &
     INIT_PID=$!
     echo "[PATH 2] Initialization process started (PID: $INIT_PID)"
 
