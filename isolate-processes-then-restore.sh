@@ -15,6 +15,13 @@ systemctl isolate rescue.target
 # Give rescue mode a moment to settle
 sleep 2
 
+echo "[$(date)] Remounting root filesystem as read-write..."
+if ! mount -o remount,rw /; then
+    echo "[$(date)] ERROR: Failed to remount root as read-write."
+    systemctl reboot
+    exit 1
+fi
+
 echo "[$(date)] Creating writable snapshot from clean-state snapshot #$SNAPSHOT_NUM..."
 if ! btrfs subvolume snapshot "/.snapshots/$SNAPSHOT_NUM/snapshot" "/.root_restored"; then
     echo "[$(date)] ERROR: Failed to create writable snapshot."
