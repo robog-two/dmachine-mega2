@@ -16,23 +16,29 @@ systemctl isolate rescue.target
 sleep 2
 
 echo "[$(date)] Creating writable snapshot from clean-state snapshot #$SNAPSHOT_NUM..."
-if ! btrfs subvolume snapshot -r "/.snapshots/$SNAPSHOT_NUM/snapshot" "/.root_restored"; then
+if ! btrfs subvolume snapshot "/.snapshots/$SNAPSHOT_NUM/snapshot" "/.root_restored"; then
     echo "[$(date)] ERROR: Failed to create writable snapshot."
     systemctl reboot
     exit 1
 fi
 
-echo "[$(date)] Swapping root filesystem with clean snapshot..."
-if ! btrfs subvolume swap "/.root_restored" "/"; then
-    echo "[$(date)] ERROR: Failed to swap subvolumes."
+echo "[$(date)] Getting snapshot subvolume ID..."
+SNAPSHOT_ID=$(btrfs inspect-internal rootid "/.root_restored")
+echo "[$(date)] Snapshot ID: $SNAPSHOT_ID"
+
+echo "[$(date)] Setting restored snapshot as default root subvolume..."
+if ! btrfs subvolume set-default "$SNAPSHOT_ID" /; then
+    echo "[$(date)] ERROR: Failed to set default subvolume."
     systemctl reboot
     exit 1
 fi
 
-echo "[$(date)] Removing old filesystem..."
-if ! btrfs subvolume delete "/.root_restored"; then
-    echo "[$(date)] WARNING: Failed to delete old root subvolume. Continuing anyway..."
-fi
+echo "[$(date)] Getting current root subvolume ID..."
+CURRENT_ROOT_ID=$(btrfs inspect-internal rootid /)
+echo "[$(date)] Current root ID: $CURRENT_ROOT_ID"
+
+# Note: We can't delete the old root subvolume because it's the current /
+# It will be accessible as a subvolume after reboot and can be cleaned up manually
 
 echo "[$(date)] Restore complete. Rebooting..."
 systemctl reboot
