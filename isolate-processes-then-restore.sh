@@ -16,7 +16,7 @@ systemctl isolate rescue.target
 sleep 2
 
 echo "[$(date)] Creating writable snapshot from clean-state snapshot #$SNAPSHOT_NUM..."
-if ! btrfs subvolume snapshot -r "/home/.snapshots/$SNAPSHOT_NUM/snapshot" "/.root_restored"; then
+if ! btrfs subvolume snapshot -r "/.snapshots/$SNAPSHOT_NUM/snapshot" "/.root_restored"; then
     echo "[$(date)] ERROR: Failed to create writable snapshot."
     systemctl reboot
     exit 1
