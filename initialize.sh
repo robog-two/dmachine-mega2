@@ -33,7 +33,6 @@ docker --version
 
 git clone https://github.com/robog-two/grapevine.git /tmp/grapevine
 
-cd /tmp/grapevine
-docker compose up --build
+(cd /tmp/grapevine; docker compose up --build &)
 
 echo "=== One-time initialization complete ==="
