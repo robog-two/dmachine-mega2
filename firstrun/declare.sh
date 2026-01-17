@@ -167,20 +167,20 @@ else
         echo "Snapper configuration for root already exists."
     fi
 
-    # Configure snapper settings for declarative infrastructure
-    echo "Configuring snapper settings..."
-    if ! snapper -c root set-config \
-        FSTYPE="btrfs" \
-        TIMELINE_CREATE="no" \
-        TIMELINE_CLEANUP="no" \
-        NUMBER_CLEANUP="yes" \
-        NUMBER_MIN_AGE="3600" \
-        NUMBER_LIMIT="10" \
-        NUMBER_LIMIT_IMPORTANT="5" \
-        BACKGROUND_COMPARISON="no"; then
-        echo "ERROR: Failed to configure snapper settings."
-        exit 1
-    fi
+     # Configure snapper settings for declarative infrastructure
+     echo "Configuring snapper settings..."
+     if ! snapper -c root set-config \
+         TIMELINE_CREATE="no" \
+         TIMELINE_CLEANUP="no" \
+         NUMBER_CLEANUP="yes" \
+         NUMBER_MIN_AGE="3600" \
+         NUMBER_LIMIT="10" \
+         NUMBER_LIMIT_IMPORTANT="5" \
+         BACKGROUND_COMPARISON="no"; then
+         echo "ERROR: Failed to configure snapper settings."
+         echo "Debug: Check snapper configuration with: snapper -c root get-config"
+         exit 1
+     fi
 
     echo "Snapper settings configured:"
     echo "  - Filesystem type: btrfs"
