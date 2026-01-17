@@ -123,19 +123,31 @@ ROOT_MOUNT=$(findmnt -n -o TARGET /)
 echo "Root filesystem: $ROOT_FS"
 echo "Root mount point: $ROOT_MOUNT"
 
-# Check if root is on Btrfs
-ROOT_FSTYPE=$(findmnt -n -o FSTYPE / | xargs)
-echo "Detected filesystem type: '$ROOT_FSTYPE'"
+# Check if root is on Btrfs using multiple methods
+ROOT_FSTYPE=""
 
-# Try multiple detection methods
-if [ "$ROOT_FSTYPE" != "btrfs" ]; then
-    # Fallback: check /proc/mounts
-    ROOT_FSTYPE=$(grep "^[^ ]* / " /proc/mounts | awk '{print $3}')
-    echo "Fallback detection from /proc/mounts: '$ROOT_FSTYPE'"
+# Method 1: Try findmnt
+if command -v findmnt &> /dev/null; then
+    ROOT_FSTYPE=$(findmnt -n -o FSTYPE / 2>/dev/null | xargs)
+    echo "findmnt detected filesystem type: '$ROOT_FSTYPE'"
 fi
 
+# Method 2: Fallback to /proc/mounts if findmnt didn't work or returned empty
+if [ -z "$ROOT_FSTYPE" ]; then
+    ROOT_FSTYPE=$(awk '$2 == "/" {print $3; exit}' /proc/mounts)
+    echo "/proc/mounts detected filesystem type: '$ROOT_FSTYPE'"
+fi
+
+# Method 3: Last resort - use stat
+if [ -z "$ROOT_FSTYPE" ]; then
+    ROOT_FSTYPE=$(stat -f -c %T / 2>/dev/null || echo "")
+    echo "stat detected filesystem type: '$ROOT_FSTYPE'"
+fi
+
+echo "Final detected filesystem type: '$ROOT_FSTYPE'"
+
 if [ "$ROOT_FSTYPE" != "btrfs" ]; then
-    echo "ERROR: Root filesystem is not Btrfs."
+    echo "ERROR: Root filesystem is not Btrfs (detected as '$ROOT_FSTYPE')."
     echo "declare-sh requires Btrfs for snapshot and restore functionality."
     echo "Please reinstall your system on Btrfs to use this tool."
     exit 1
