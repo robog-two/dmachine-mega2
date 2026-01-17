@@ -36,5 +36,3 @@ git clone https://github.com/robog-two/grapevine.git /tmp/grapevine
 cd /tmp/grapevine;
 git checkout genai-here-only;
 docker compose up --build
-
-# I needed a frivolous commit to trigger a restore because something broke.
