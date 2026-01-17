@@ -7,7 +7,11 @@ set -euo pipefail
 SNAPSHOT_NUM="$1"
 REPO_DIR="$2"
 
-cd "$REPO_DIR"
+# Redirect output to system console so logs remain visible even after unmounting /
+# /dev/console is a kernel device that persists across filesystem unmounts
+exec > /dev/console 2>&1
+
+cd "$REPO_DIR" 2>/dev/null || true
 
 echo "[$(date)] Entering rescue mode for filesystem swap..."
 systemctl isolate rescue.target
