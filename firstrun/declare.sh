@@ -154,31 +154,40 @@ if [ "$ROOT_FSTYPE" != "btrfs" ]; then
 else
     echo "Btrfs root filesystem detected. Setting up Snapper..."
 
-    # Create snapper config for root if it doesn't exist
-    if ! snapper -c root list &>/dev/null; then
-        echo "Creating snapper configuration for root..."
-        if ! snapper -c root create-config /; then
-            echo "ERROR: Failed to create snapper configuration."
-            echo "Check that your Btrfs root subvolume is properly configured."
-            exit 1
-        fi
-        echo "Snapper configuration created."
-    else
-        echo "Snapper configuration for root already exists."
-    fi
+     # Create snapper config for root if it doesn't exist
+     if ! snapper -c root list &>/dev/null; then
+         echo "Creating snapper configuration for root..."
+         if ! snapper -c root create-config /; then
+             echo "ERROR: Failed to create snapper configuration."
+             echo "Check that your Btrfs root subvolume is properly configured."
+             exit 1
+         fi
+         echo "Snapper configuration created."
+     else
+         echo "Snapper configuration for root already exists."
+     fi
 
      # Configure snapper settings for declarative infrastructure
      echo "Configuring snapper settings..."
-     if ! snapper -c root set-config \
-         TIMELINE_CREATE="no" \
-         TIMELINE_CLEANUP="no" \
-         NUMBER_CLEANUP="yes" \
-         NUMBER_MIN_AGE="3600" \
-         NUMBER_LIMIT="10" \
-         NUMBER_LIMIT_IMPORTANT="5" \
-         BACKGROUND_COMPARISON="no"; then
-         echo "ERROR: Failed to configure snapper settings."
-         echo "Debug: Check snapper configuration with: snapper -c root get-config"
+     
+     # Create a temporary config file to avoid "Invalid configdata" issues
+     SNAPPER_CONFIG="/etc/snapper/configs/root"
+     if [ -f "$SNAPPER_CONFIG" ]; then
+         # Backup original config
+         cp "$SNAPPER_CONFIG" "$SNAPPER_CONFIG.bak"
+         
+         # Update config file directly for more reliable configuration
+         sed -i 's/^TIMELINE_CREATE=.*/TIMELINE_CREATE="no"/' "$SNAPPER_CONFIG"
+         sed -i 's/^TIMELINE_CLEANUP=.*/TIMELINE_CLEANUP="no"/' "$SNAPPER_CONFIG"
+         sed -i 's/^NUMBER_CLEANUP=.*/NUMBER_CLEANUP="yes"/' "$SNAPPER_CONFIG"
+         sed -i 's/^NUMBER_MIN_AGE=.*/NUMBER_MIN_AGE="3600"/' "$SNAPPER_CONFIG"
+         sed -i 's/^NUMBER_LIMIT=.*/NUMBER_LIMIT="10"/' "$SNAPPER_CONFIG"
+         sed -i 's/^NUMBER_LIMIT_IMPORTANT=.*/NUMBER_LIMIT_IMPORTANT="5"/' "$SNAPPER_CONFIG"
+         sed -i 's/^BACKGROUND_COMPARISON=.*/BACKGROUND_COMPARISON="no"/' "$SNAPPER_CONFIG"
+         
+         echo "Snapper configuration updated."
+     else
+         echo "ERROR: Snapper config file not found at $SNAPPER_CONFIG"
          exit 1
      fi
 
