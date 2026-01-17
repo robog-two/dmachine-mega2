@@ -21,9 +21,19 @@ mount -o remount,rw / || true
 echo "[$(date)] Unsetting btrfs read-only property..."
 btrfs property set / ro false || true
 
+echo "[$(date)] Checking if /.snapshots is mounted read-only..."
+if mount | grep -q "on /.snapshots"; then
+    echo "[$(date)] Remounting /.snapshots as read-write..."
+    mount -o remount,rw /.snapshots || true
+fi
+
 echo "[$(date)] Creating writable snapshot from clean-state snapshot #$SNAPSHOT_NUM..."
 if ! btrfs subvolume snapshot "/.snapshots/$SNAPSHOT_NUM/snapshot" "/.root_restored"; then
     echo "[$(date)] ERROR: Failed to create writable snapshot."
+    echo "[$(date)] Checking mount and permissions..."
+    mount | grep "on / "
+    btrfs property get / ro
+    mount | grep snapshots || true
     systemctl reboot
     exit 1
 fi
