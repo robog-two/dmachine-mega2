@@ -46,41 +46,14 @@ if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
     fi
 
     echo "[$(date)] Found clean-state snapshot: #$SNAPSHOT_NUM"
-    echo "[$(date)] Performing restore..."
+    echo "[$(date)] Spawning isolated restore process..."
 
-    # Get the current default subvolume
-    CURRENT_SUBVOL=$(btrfs subvolume get-default / | awk '{print $NF}')
-    echo "[$(date)] Current subvolume: $CURRENT_SUBVOL"
+    # Spawn the restore script detached so it survives systemctl isolate
+    # Use nohup and & to detach from cron/current process group
+    nohup bash "$REPO_DIR/isolate-processes-then-restore.sh" "$SNAPSHOT_NUM" "$REPO_DIR" > /var/log/declare-sh-restore.log 2>&1 &
 
-    # Create a writable snapshot from the read-only clean-state snapshot
-    echo "[$(date)] Creating writable copy from clean-state snapshot..."
-    if ! btrfs subvolume snapshot "/home/.snapshots/$SNAPSHOT_NUM/snapshot" "/.root_restored"; then
-        echo "[$(date)] ERROR: Failed to create writable snapshot."
-        echo "[$(date)] Falling back to reboot without restore."
-        systemctl reboot
-        exit 1
-    fi
-
-    # Swap the subvolumes so the clean state becomes the root filesystem
-    # After swap: "/" contains clean filesystem, "/.root_restored" contains old modified filesystem
-    echo "[$(date)] Swapping root filesystem with clean snapshot..."
-    if ! btrfs subvolume swap "/.root_restored" "/"; then
-        echo "[$(date)] ERROR: Failed to swap subvolumes."
-        echo "[$(date)] Falling back to reboot without restore."
-        systemctl reboot
-        exit 1
-    fi
-
-    # Delete the old root filesystem (now at /.root_restored)
-    echo "[$(date)] Removing old filesystem..."
-    if ! btrfs subvolume delete "/.root_restored"; then
-        echo "[$(date)] WARNING: Failed to delete old root subvolume. Continuing anyway..."
-    fi
-
-    echo "[$(date)] Restore complete. Rebooting to verify..."
-
-    # Trigger system reboot
-    systemctl reboot
+    echo "[$(date)] Restore process spawned (PID: $!). Exiting to allow it to continue..."
+    exit 0
 else
     echo "[$(date)] No changes detected. System is up to date."
 fi
