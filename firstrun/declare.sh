@@ -124,8 +124,15 @@ echo "Root filesystem: $ROOT_FS"
 echo "Root mount point: $ROOT_MOUNT"
 
 # Check if root is on Btrfs
-ROOT_FSTYPE=$(findmnt -n -o FSTYPE / | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-echo "Detected filesystem type: $ROOT_FSTYPE"
+ROOT_FSTYPE=$(findmnt -n -o FSTYPE / | xargs)
+echo "Detected filesystem type: '$ROOT_FSTYPE'"
+
+# Try multiple detection methods
+if [ "$ROOT_FSTYPE" != "btrfs" ]; then
+    # Fallback: check /proc/mounts
+    ROOT_FSTYPE=$(grep "^[^ ]* / " /proc/mounts | awk '{print $3}')
+    echo "Fallback detection from /proc/mounts: '$ROOT_FSTYPE'"
+fi
 
 if [ "$ROOT_FSTYPE" != "btrfs" ]; then
     echo "ERROR: Root filesystem is not Btrfs."
