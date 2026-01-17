@@ -33,8 +33,8 @@ docker --version
 
 git clone https://github.com/robog-two/grapevine.git /tmp/grapevine
 
-(cd /tmp/grapevine; git checkout genai-here-only; docker compose up --build > /dev/console 2>&1 &)
-
-echo "=== One-time initialization complete ==="
+cd /tmp/grapevine;
+git checkout genai-here-only;
+docker compose up --build
 
 # I needed a frivolous commit to trigger a restore because something broke.
