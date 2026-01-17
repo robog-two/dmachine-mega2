@@ -125,15 +125,21 @@ echo "Root mount point: $ROOT_MOUNT"
 
 # Check if root is on Btrfs
 if ! btrfs filesystem show "$ROOT_FS" &>/dev/null; then
-    echo "WARNING: Root filesystem is not Btrfs. Snapshot creation skipped."
-    echo "You will need to manually configure restore functionality for your filesystem."
+    echo "ERROR: Root filesystem is not Btrfs."
+    echo "declare-sh requires Btrfs for snapshot and restore functionality."
+    echo "Please reinstall your system on Btrfs to use this tool."
+    exit 1
 else
     echo "Btrfs root filesystem detected. Setting up Snapper..."
 
     # Create snapper config for root if it doesn't exist
     if ! snapper -c root list &>/dev/null; then
         echo "Creating snapper configuration for root..."
-        snapper -c root create-config /
+        if ! snapper -c root create-config /; then
+            echo "ERROR: Failed to create snapper configuration."
+            echo "Check that your Btrfs root subvolume is properly configured."
+            exit 1
+        fi
         echo "Snapper configuration created."
     else
         echo "Snapper configuration for root already exists."
@@ -141,7 +147,7 @@ else
 
     # Configure snapper settings for declarative infrastructure
     echo "Configuring snapper settings..."
-    snapper -c root set-config \
+    if ! snapper -c root set-config \
         FSTYPE="btrfs" \
         TIMELINE_CREATE="no" \
         TIMELINE_CLEANUP="no" \
@@ -149,7 +155,10 @@ else
         NUMBER_MIN_AGE="3600" \
         NUMBER_LIMIT="10" \
         NUMBER_LIMIT_IMPORTANT="5" \
-        BACKGROUND_COMPARISON="no"
+        BACKGROUND_COMPARISON="no"; then
+        echo "ERROR: Failed to configure snapper settings."
+        exit 1
+    fi
 
     echo "Snapper settings configured:"
     echo "  - Filesystem type: btrfs"
@@ -159,23 +168,6 @@ else
     echo "  - Number limit: 10 snapshots"
     echo "  - Important snapshots limit: 5"
     echo "  - Background comparison: disabled (for performance)"
-
-    # Delete the default snapshot that snapper creates
-    if snapper -c root list | grep -q "^0 "; then
-        echo "Removing default snapper snapshot..."
-        snapper -c root delete 0 2>/dev/null || true
-    fi
-
-    # Delete any existing clean-state snapshot to overwrite it
-    EXISTING_SNAPSHOT=$(snapper -c root --csvout list --columns number,description | \
-        grep ",clean-state$" | \
-        cut -d',' -f1 | \
-        tail -n 1)
-
-    if [ -n "$EXISTING_SNAPSHOT" ]; then
-        echo "Removing existing clean-state snapshot #$EXISTING_SNAPSHOT..."
-        snapper -c root delete "$EXISTING_SNAPSHOT" 2>/dev/null || true
-    fi
 
     # Create the clean-state snapshot
     echo "Creating clean-state snapshot..."
